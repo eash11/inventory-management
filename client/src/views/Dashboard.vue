@@ -157,6 +157,57 @@
           </div>
         </div>
 
+        <!-- Low Stock Alerts -->
+        <div class="card chart-card full-width">
+          <div class="card-header">
+            <h3 class="card-title">Low Stock Alerts <span v-if="lowStockAlerts.length > 0" class="alert-count-badge">{{ lowStockAlerts.length }}</span></h3>
+          </div>
+          <div v-if="lowStockAlerts.length === 0" class="no-backlog">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="success-icon">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+            </svg>
+            <p class="no-backlog-text">All inventory levels are healthy</p>
+          </div>
+          <div v-else class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Warehouse</th>
+                  <th>On Hand</th>
+                  <th>Reorder Point</th>
+                  <th>Deficit</th>
+                  <th>Severity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in lowStockAlerts" :key="item.sku">
+                  <td><strong>{{ item.sku }}</strong></td>
+                  <td>{{ translateProductName(item.name) }}</td>
+                  <td>{{ translateCategory(item.category) }}</td>
+                  <td>{{ translateWarehouse(item.warehouse) }}</td>
+                  <td>
+                    <span :style="{ color: item.quantity_on_hand === 0 ? '#ef4444' : '#f59e0b', fontWeight: 600 }">
+                      {{ item.quantity_on_hand }}
+                    </span>
+                  </td>
+                  <td>{{ item.reorder_point }}</td>
+                  <td>
+                    <span class="badge danger">{{ item.deficit }} units</span>
+                  </td>
+                  <td>
+                    <span :class="['badge', item.severity === 'critical' ? 'danger' : 'warning']">
+                      {{ item.severity === 'critical' ? 'Out of Stock' : 'Low Stock' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Inventory Shortages -->
         <div class="card chart-card full-width">
           <div class="card-header">
@@ -558,6 +609,17 @@ export default {
       return allBacklogItems.value.filter(b => validSkus.has(b.item_sku))
     })
 
+    const lowStockAlerts = computed(() => {
+      return inventoryItems.value
+        .filter(item => item.quantity_on_hand <= item.reorder_point)
+        .map(item => ({
+          ...item,
+          deficit: item.reorder_point - item.quantity_on_hand,
+          severity: item.quantity_on_hand === 0 ? 'critical' : 'low'
+        }))
+        .sort((a, b) => b.deficit - a.deficit)
+    })
+
     const loadData = async () => {
       try {
         loading.value = true
@@ -694,6 +756,7 @@ export default {
       maxOrderCount,
       topProducts,
       backlogItems,
+      lowStockAlerts,
       calculatePercentage,
       getCircleSegment,
       getStockBadge,
@@ -1267,5 +1330,21 @@ export default {
   background: #475569;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(100, 116, 139, 0.3);
+}
+
+.alert-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  min-width: 1.375rem;
+  height: 1.375rem;
+  padding: 0 0.375rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 </style>

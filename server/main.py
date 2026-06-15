@@ -304,6 +304,56 @@ def get_monthly_trends():
     result.sort(key=lambda x: x['month'])
     return result
 
+# In-memory restocking orders (resets on server restart, consistent with other mock data)
+restocking_orders_list = []
+
+class RestockingOrderItem(BaseModel):
+    sku: str
+    name: str
+    category: str
+    warehouse: str
+    quantity: int
+    unit_cost: float
+    total_cost: float
+
+class RestockingOrder(BaseModel):
+    id: str
+    order_number: str
+    items: List[RestockingOrderItem]
+    total_cost: float
+    budget: float
+    status: str
+    created_date: str
+    expected_delivery: str
+
+class CreateRestockingOrderRequest(BaseModel):
+    items: List[RestockingOrderItem]
+    budget: float
+
+@app.get("/api/restocking/orders", response_model=List[RestockingOrder])
+def get_restocking_orders():
+    """Get all submitted restocking orders"""
+    return restocking_orders_list
+
+@app.post("/api/restocking/orders", response_model=RestockingOrder)
+def create_restocking_order(request: CreateRestockingOrderRequest):
+    """Submit a new restocking order with 14-day fixed lead time"""
+    from datetime import datetime, timedelta
+    order_id = str(len(restocking_orders_list) + 1)
+    created_dt = datetime.utcnow()
+    order = {
+        "id": order_id,
+        "order_number": f"RST-{created_dt.strftime('%Y%m%d')}-{order_id.zfill(4)}",
+        "items": [item.model_dump() for item in request.items],
+        "total_cost": round(sum(item.total_cost for item in request.items), 2),
+        "budget": request.budget,
+        "status": "Submitted",
+        "created_date": created_dt.isoformat(),
+        "expected_delivery": (created_dt + timedelta(days=14)).isoformat()
+    }
+    restocking_orders_list.append(order)
+    return order
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
